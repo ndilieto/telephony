@@ -1,0 +1,22 @@
+--- a/libsofia-sip-ua/nua/nua_client.c	2021-02-23 17:53:17.000000000 +0100
++++ b/libsofia-sip-ua/nua/nua_client.c	2021-07-11 17:56:04.510022210 +0200
+@@ -1644,7 +1637,8 @@
+ 
+   assert(nh != nua->nua_dhandle);
+ 
+-  if (nua_stack_set_params(nua, nh, nua_i_error, tags) < 0)
++  if (nua_stack_set_params(nua, nh, nua_i_error, tags) < 0 ||
++      nua_stack_init_instance(nua, nua->nua_args) < 0)
+     retval = -1;
+ 
+   if (retval || nh->nh_init) /* Already initialized? */
+--- a/libsofia-sip-ua/nua/nua_stack.c	2021-02-23 17:53:17.000000000 +0100
++++ b/libsofia-sip-ua/nua/nua_stack.c	2021-07-11 17:02:08.290066358 +0200
+@@ -191,6 +191,7 @@
+   if (nua->nua_nta == NULL ||
+       dnh->nh_ds->ds_leg == NULL ||
+       nta_agent_set_params(nua->nua_nta, NTATAG_UA(1), TAG_END()) < 0 ||
++      nua_stack_init_instance(nua, nua->nua_args) < 0 ||
+       nua_stack_init_transport(nua, nua->nua_args) < 0) {
+     SU_DEBUG_1(("nua: initializing SIP stack failed\n" VA_NONE));
+     return -1;

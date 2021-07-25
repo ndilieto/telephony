@@ -1,0 +1,43 @@
+--- a/libsofia-sip-ua/nta/nta.c	2021-07-13 16:24:46.621732060 +0200
++++ b/libsofia-sip-ua/nta/nta.c	2021-07-13 16:42:01.905780436 +0200
+@@ -951,7 +951,7 @@
+       timer_d = agent->sa_t1x64;
+ 
+     outgoing_queue_init(agent->sa_out.delayed, 0);
+-    outgoing_queue_init(agent->sa_out.resolving, 0);
++    outgoing_queue_init(agent->sa_out.resolving, agent->sa_t1x64); /* F */
+     outgoing_queue_init(agent->sa_out.trying, agent->sa_t1x64); /* F */
+     outgoing_queue_init(agent->sa_out.completed, agent->sa_t4); /* K */
+     outgoing_queue_init(agent->sa_out.terminated, 0);
+@@ -1270,6 +1270,7 @@
+   if (agent->sa_out.inv_proceeding->q_timeout)
+     NEXT_TIMEOUT(next, agent->sa_out.inv_proceeding->q_head, orq_timeout, now);
+   NEXT_TIMEOUT(next, agent->sa_out.trying->q_head, orq_timeout, now);
++  NEXT_TIMEOUT(next, agent->sa_out.resolving->q_head, orq_timeout, now);
+ 
+   NEXT_TIMEOUT(next, agent->sa_in.preliminary->q_head, irq_timeout, now);
+   NEXT_TIMEOUT(next, agent->sa_in.inv_completed->q_head, irq_timeout, now);
+@@ -1287,9 +1288,10 @@
+ 	/* check it there are still things queued, if there are, that means everything scheduled is > 15 days in the future */
+     /* in this case, we had a large time shift, we should schedule for 15 days in the future (which is probably still before now) */
+ 	/* and this should sort itself out on the next run through */
+-    if ( !agent->sa_out.completed->q_head && !agent->sa_out.trying->q_head && !agent->sa_out.inv_calling->q_head &&
+-		 !agent->sa_out.re_list && !agent->sa_in.inv_confirmed->q_head && !agent->sa_in.preliminary->q_head &&
+-		 !agent->sa_in.completed->q_head && !agent->sa_in.inv_completed->q_head && !agent->sa_in.re_list ) {
++    if ( !agent->sa_out.completed->q_head && !agent->sa_out.trying->q_head && !agent->sa_out.resolving->q_head &&
++		 !agent->sa_out.inv_calling->q_head && !agent->sa_out.re_list && !agent->sa_in.inv_confirmed->q_head &&
++		 !agent->sa_in.preliminary->q_head && !agent->sa_in.completed->q_head && !agent->sa_in.inv_completed->q_head &&
++		 !agent->sa_in.re_list ) {
+ 		SU_DEBUG_9(("nta: timer not set\n" VA_NONE));
+ 		return;
+ 	}
+@@ -8980,7 +8982,8 @@
+   timeout
+     = outgoing_timer_bf(sa->sa_out.inv_calling, "B", now)
+     + outgoing_timer_c(sa->sa_out.inv_proceeding, "C", now)
+-    + outgoing_timer_bf(sa->sa_out.trying, "F", now);
++    + outgoing_timer_bf(sa->sa_out.trying, "F", now)
++    + outgoing_timer_bf(sa->sa_out.resolving, "F", now);
+ 
+   destroyed = outgoing_mass_destroy(sa, rq);
+ 
