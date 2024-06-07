@@ -1,0 +1,74 @@
+diff --git a/modules/turn/alloc.c b/modules/turn/alloc.c
+index 03bd813..952ec9f 100644
+--- a/modules/turn/alloc.c
++++ b/modules/turn/alloc.c
+@@ -5,6 +5,7 @@
+  */
+ 
+ #include <string.h>
++#include <stdlib.h>
+ #include <re.h>
+ #include <restund.h>
+ #include "turn.h"
+@@ -150,10 +151,15 @@ static int relay_listen(const struct sa *rel_addr, struct allocation *al,
+ 	int err = 0;
+ 
+ 	for (i=0; i<PORT_TRY_MAX; i++) {
++		struct sa addr = *rel_addr;
++		sa_set_port(&addr, turndp()->rel_min_port + rand() %
++			(turndp()->rel_max_port - turndp()->rel_min_port + 1));
+ 
+-		err = udp_listen(&al->rel_us, rel_addr, udp_recv, al);
++		restund_debug("turn: try#%u: %J\n", i, &addr);
++
++		err = udp_listen(&al->rel_us, &addr, udp_recv, al);
+ 		if (err)
+-			break;
++			continue;
+ 
+ 		err = udp_local_get(al->rel_us, &al->rel_addr);
+ 		if (err) {
+@@ -164,8 +170,6 @@ static int relay_listen(const struct sa *rel_addr, struct allocation *al,
+ 		if (!even)
+ 			break;
+ 
+-		restund_debug("turn: try#%u: %J\n", i, &al->rel_addr);
+-
+ 		if (sa_port(&al->rel_addr) & 0x1) {
+ 			al->rel_us = mem_deref(al->rel_us);
+ 			continue;
+diff --git a/modules/turn/turn.c b/modules/turn/turn.c
+index ae7fb46..513fc88 100644
+--- a/modules/turn/turn.c
++++ b/modules/turn/turn.c
+@@ -348,6 +348,17 @@ static int module_init(void)
+ 		goto out;
+ 	}
+ 
++	turnd.rel_min_port = 0xC000;
++	turnd.rel_max_port = 0xFFFF;
++	conf_get_u32(restund_conf(), "turn_relay_min_port", &turnd.rel_min_port);
++	conf_get_u32(restund_conf(), "turn_relay_max_port", &turnd.rel_max_port);
++	if (turnd.rel_min_port > 0xFFFF || turnd.rel_max_port > 0xFFFF ||
++	    turnd.rel_min_port >= turnd.rel_max_port) {
++		restund_error("turn: bad turn_relay_{min,max}_port combination\n");
++		err = EINVAL;
++		goto out;
++	}
++
+ 	/* turn_external_addr6 */
+ 	if (!conf_get(restund_conf(), "turn_relay_addr6", &opt))
+ 		err = sa_set(&turnd.rel_addr6, &opt, 0);
+diff --git a/modules/turn/turn.h b/modules/turn/turn.h
+index a7f882d..1fa0960 100644
+--- a/modules/turn/turn.h
++++ b/modules/turn/turn.h
+@@ -7,6 +7,8 @@ struct turnd {
+ struct turnd {
+ 	struct sa rel_addr;
+ 	struct sa rel_addr6;
++	uint32_t rel_min_port;
++	uint32_t rel_max_port;
+ 	struct hash *ht_alloc;
+ 	uint64_t bytec_tx;
+ 	uint64_t bytec_rx;
